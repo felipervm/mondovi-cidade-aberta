@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mondovì · Cidade aberta</title>
+<style>
+:root{color-scheme:light;--bg:#eee9d9;--paper:#faf5e8;--ink:#283b32;--green:#345b49;--line:#d8cdb6;--brick:#9d4a3d}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px system-ui,sans-serif}
+main{max-width:1260px;margin:auto;padding:24px}header{display:flex;justify-content:space-between;align-items:end;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+h1,h2,h3{font-family:Georgia,serif;font-weight:normal;margin:0}h1{font-size:clamp(37px,6vw,68px);letter-spacing:-.07em;line-height:.98}h2{font-size:26px}h3{font-size:20px}
+.kicker{display:block;font:700 11px ui-monospace,monospace;letter-spacing:.13em;text-transform:uppercase;color:var(--brick);margin-bottom:7px}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 276px;gap:14px}
+.game,.card{background:var(--paper);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.stage{position:relative;background:#8ca376}.stage canvas{display:block;width:100%;height:auto;image-rendering:pixelated;touch-action:none}
+.location,.near{position:absolute;color:#fdf3d6;background:#283e32ed;border:1px solid #f8edc270;border-radius:6px;padding:7px 10px;font-size:12px}
+.location{left:11px;top:11px;max-width:80%}.near{bottom:12px;left:50%;transform:translateX(-50%);max-width:91%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.near:hover{background:#426650}
+.toolbar{display:flex;gap:8px;padding:9px 12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+kbd{padding:2px 4px;border:1px solid #cfbea1;border-radius:4px;background:#eee5d0;font-size:12px}
+button{font:inherit;color:inherit;background:#f3e9d2;border:1px solid #cbbd9b;border-radius:6px;padding:7px 10px;cursor:pointer}
+button:hover,button:focus-visible{background:#ebdbb7}.primary{background:var(--green);color:white;border-color:var(--green)}.primary:hover,.primary:focus-visible{background:#46755f}
+.move{display:flex;gap:4px}.move button{touch-action:none;padding:5px 9px}
+aside{display:grid;align-content:start;gap:10px}.card{padding:14px}.card p{margin:7px 0;font-size:13px}
+.visitList{display:grid;gap:5px;margin:10px 0 0}.visitList button{text-align:left;font-size:13px}.small{color:#645e4f;font-size:12px}
+.row{display:flex;gap:7px;flex-wrap:wrap;align-items:center}.pill{display:inline-block;font-size:11px;padding:3px 6px;border:1px solid #cfbfa5;border-radius:4px}
+footer{margin-top:12px;color:#605a4e;font-size:12px}a{color:var(--green)}
+dialog{width:min(94vw,690px);max-height:90vh;border:1px solid #bbaa85;background:var(--paper);color:var(--ink);border-radius:12px;padding:17px;box-shadow:0 20px 70px #192a2280}
+dialog::backdrop{background:#263b2db0}.modalHead{display:flex;align-items:start;justify-content:space-between;gap:10px}.utterance{font:24px/1.3 Georgia,serif;margin:14px 0}.choices{display:grid;gap:6px;margin:10px 0}.choices button{text-align:left}.note{background:#efe6cf;border-radius:6px;padding:8px 11px}
+textarea,input[type=search]{width:100%;padding:9px;border:1px solid #bbac8b;border-radius:6px;background:#fff9eb;color:inherit;font:inherit}textarea{min-height:66px;resize:vertical}
+.mapCanvas{display:block;width:100%;height:auto;margin:10px 0;border-radius:7px;cursor:grab;background:#a6b98f;touch-action:none}.mapCanvas:active{cursor:grabbing}.results{max-height:174px;overflow-y:auto;display:grid;gap:5px;margin-top:7px}.results button{text-align:left}
+.missionCard{border-top:3px solid var(--brick)}.missionCard ol{padding-left:22px;font-size:13px}.missionCard li{padding:3px 0}
+.choices[hidden]{display:none}.visitList{max-height:200px;overflow:auto}
+dl{margin:8px 0}dt{font-weight:650;margin-top:8px}dd{margin-left:0;color:#635b4b}
+@media(max-width:780px){main{padding:14px}.layout{grid-template-columns:1fr}aside{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:490px){aside{grid-template-columns:1fr}.toolbar{font-size:12px}main{padding:10px}}
+</style>
+<main>
+<header><div><span class="kicker">RPG de imersão em italiano</span><h1>Mondovì</h1></div><div class="row"><button id="openMissions">Missões</button><button id="openMap">Mapa da cidade</button><button id="openJournal">Caderno</button></div></header>
+<div class="layout">
+<section class="game" aria-label="Cidade aberta">
+<div class="stage"><canvas id="world" width="620" height="392" aria-label="Jogo em pixel art com a geometria real de Mondovì"></canvas><div id="location" class="location"></div><button id="near" class="near" hidden></button></div>
+<div class="toolbar"><div><kbd>WASD</kbd> andar/dirigir &nbsp; <kbd>E</kbd> interagir &nbsp; <kbd>V</kbd> veículo &nbsp; <kbd>M</kbd> mapa</div><div class="move"><button data-key="ArrowLeft" aria-label="Esquerda">←</button><button data-key="ArrowUp" aria-label="Cima">↑</button><button data-key="ArrowDown" aria-label="Baixo">↓</button><button data-key="ArrowRight" aria-label="Direita">→</button><button id="vehicle">Veículo</button><button class="primary" id="talk">Interagir</button></div></div>
+</section>
+<aside>
+<section class="card missionCard"><span class="kicker">Missão acompanhada</span><div id="missionStatus"></div></section>
+<section class="card"><span class="kicker">Altipiano · Breo · Piazza</span><h2>Explore à vontade</h2><p id="navigation">Marque um destino no mapa ou ande até um balão de conversa.</p><button id="clearPin" hidden>Remover destino</button></section>
+<section class="card"><span class="kicker">Conversas na cidade</span><div id="visits" class="visitList"></div></section>
+<section class="card"><span class="kicker">Italiano na prática</span><p id="progress"></p><button id="openSkills">Trilha até C1</button></section>
+</aside>
+</div>
+<footer>Ruas, edifícios e locais de interesse do <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a> · <a href="https://www.openstreetmap.org/#map=16/44.3897/7.8242" target="_blank" rel="noopener">ver a cidade no OSM</a> · Personagens e situações fictícios em locais mapeados.</footer>
+</main>
+<dialog id="modal" aria-labelledby="modalTitle"></dialog>
+<script>
+"use strict";
+/* MAP_DATA */
+/* GAME_CONTENT */
+/* GAME_CODE */
+/* GAME_SYSTEMS */
+</script>
+</html>
