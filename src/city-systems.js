@@ -201,10 +201,10 @@ function vehicleAction(){
  }
  const vehicle=nearVehicle();
  if(vehicle){
-  driven=vehicle;player=vehicle.point;driveState=attachCar(player);refreshRoute(previous,true);return;
+  driven=vehicle;player=vehicle.point;driveState=attachCar();refreshRoute(previous,true);return;
  }
  const closest=[...parked].sort((a,b)=>distance(player,a.point)-distance(player,b.point))[0];
- open("Veicoli","Auto condivisa",'<p>Avvicinati a un’auto con il simbolo V. Premi V per salire o scendere. Usa le frecce per scegliere la direzione, la guida assistita segue la strada.</p>'+
+ open("Veicoli","Auto condivisa",'<p>Avvicinati a un’auto con il simbolo V. Premi V per salire o scendere. Le frecce muovono direttamente l’auto nella direzione indicata. Rilascia i tasti per fermarti.</p>'+
   (closest?'<button id="findVehicle" class="primary">Segna l’auto più vicina</button>':''));
  if(closest)$("findVehicle").onclick=()=>{setPin(closest.point,closest.name+" / Auto");modal.close();};
 }

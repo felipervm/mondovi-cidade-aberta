@@ -4,7 +4,7 @@ Un RPG 2D per praticare l’italiano nella geografia reale di Mondovì. Apri `in
 
 - WASD o frecce per camminare e scegliere la direzione dell’auto.
 - E per parlare e interagire.
-- V vicino a un’auto condivisa per salire o scendere. La guida assistita segue le strade e smorza accelerazione, frenata e curve.
+- V vicino a un’auto condivisa per salire o scendere. Le frecce muovono direttamente l’auto nella direzione indicata. Rilasciandole, l’auto si ferma. Edifici e bordi della carreggiata limitano il movimento.
 - M per la mappa. Trascina, usa la rotella o i pulsanti + e − e scegli una destinazione.
 - Missioni per seguire gli incontri e aggiornare il percorso.
 - Impostazioni per abilitare gli aiuti facoltativi in portoghese.

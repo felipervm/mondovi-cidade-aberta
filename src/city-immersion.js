@@ -191,42 +191,43 @@ for(const [id,name,kind,point] of city.places){
  mapItems.set(id,{name:actor.site,kind:typeNames[kind]||"Attività",point:actor.point});
 }
 directory.splice(0,directory.length,...[...mapItems.values()].sort((a,b)=>collator.compare(a.name,b.name)));
-function attachCar(point){
- const options=inCityEdges.map(lane=>({lane,p:nearestOn(point,lane.a,lane.b)})).sort((a,b)=>distance(point,a.p)-distance(point,b.p));
- const lane=options[0].lane,p=options[0].p;
- driveAngle=Math.atan2(lane.b[1]-lane.a[1],lane.b[0]-lane.a[0]);
- return {lane,offset:distance(lane.a,p),speed:0};
+function attachCar(){
+ return {speed:0};
 }
 function moveAssistedCar(dx,dy,dt){
- if(!driveState)driveState=attachCar(player);
- const state=driveState,wants=Boolean(dx||dy);
- const target=wants?86:0;
- state.speed+=(target-state.speed)*(1-Math.exp(-dt*(wants?4:9)));
- if(state.speed<.1)return false;
- const heading=Math.atan2(dy,dx);
- const alignment=lane=>{
-  const angle=Math.atan2(lane.b[1]-lane.a[1],lane.b[0]-lane.a[0]);
-  return wants?Math.cos(angle-heading):Math.cos(angle-driveAngle);
- };
- const reverse=(junctions.get(state.lane.exit)||[]).find(lane=>lane.exit===state.lane.start);
- if(wants&&reverse&&alignment(state.lane)<-.65){
-  state.offset=state.lane.length-state.offset;state.lane=reverse;
+ if(!driveState)driveState=attachCar();
+ const length=Math.hypot(dx,dy);
+ if(!length){
+  driveState.speed=0;
+  return false;
  }
- state.offset+=state.speed*dt;
- while(state.offset>=state.lane.length){
-  const exits=junctions.get(state.lane.exit)||[];
-  if(!exits.length){state.offset=state.lane.length;state.speed=0;break;}
-  state.offset-=state.lane.length;
-  const forward=exits.filter(lane=>lane.exit!==state.lane.start);
-  const options=forward.length?forward:exits;
-  state.lane=[...options].sort((a,b)=>alignment(b)-alignment(a))[0];
+ const inputX=dx/length,inputY=dy/length;
+ driveState.speed+=(64-driveState.speed)*(1-Math.exp(-dt*16));
+ const travel=driveState.speed*dt;
+ const steps=Math.max(1,Math.ceil(travel/.45));
+ const step=travel/steps;
+ const start=player;
+ for(let i=0;i<steps;i++){
+  const destination=[player[0]+inputX*step,player[1]+inputY*step];
+  if(driveable(destination)){
+   player=destination;
+   continue;
+  }
+  // Slide along an obstacle only in an axis the player is pressing.
+  const horizontal=[player[0]+inputX*step,player[1]];
+  if(inputX&&driveable(horizontal))player=horizontal;
+  const vertical=[player[0],player[1]+inputY*step];
+  if(inputY&&driveable(vertical))player=vertical;
  }
- const lane=state.lane,t=clamp(state.offset/lane.length,0,1);
- player=lane.a.map((v,i)=>v+(lane.b[i]-v)*t);
- const angle=Math.atan2(lane.b[1]-lane.a[1],lane.b[0]-lane.a[0]);
+ const movedX=player[0]-start[0],movedY=player[1]-start[1];
+ if(Math.hypot(movedX,movedY)<.0001){
+  driveState.speed=0;
+  return false;
+ }
+ const angle=Math.atan2(movedY,movedX);
  const diff=Math.atan2(Math.sin(angle-driveAngle),Math.cos(angle-driveAngle));
- driveAngle+=diff*(1-Math.exp(-dt*12));
- return state.speed>.1;
+ driveAngle+=diff*(1-Math.exp(-dt*20));
+ return true;
 }
 $("openSettings").onclick=settingsDialog;
 updateSidebar();

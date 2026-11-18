@@ -102,10 +102,29 @@ vehicleAction();
 assert(driven && driveState);
 for(let i=0;i<600;i++)moveAssistedCar(0,-1,1/60);
 assert(player.every(Number.isFinite));
-assert(distance(player, nearestOn(player, driveState.lane.a, driveState.lane.b)) < .01);
-const speed = driveState.speed;
+assert(driveable(player));
+const controlOrigin=inCityEdges.map(lane=>lane.a.map((v,i)=>(v+lane.b[i])/2))
+ .find(p=>[[3,0],[-3,0],[0,3],[0,-3]].every(([x,y])=>driveable([p[0]+x,p[1]+y])));
+assert(controlOrigin,'find open road space for directional control');
+for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+ player=[...controlOrigin];driveState=attachCar();
+ for(let i=0;i<4;i++)moveAssistedCar(dx,dy,1/60);
+ assert((player[0]-controlOrigin[0])*dx+(player[1]-controlOrigin[1])*dy>0);
+ if(!dx)assert.equal(player[0],controlOrigin[0],'vertical key must not force a horizontal turn');
+ if(!dy)assert.equal(player[1],controlOrigin[1],'horizontal key must not force a vertical turn');
+}
+player=[...controlOrigin];driveState=attachCar();
+moveAssistedCar(1,0,1/60);
+const afterRight=[...player];
+moveAssistedCar(0,-1,1/60);
+assert.equal(player[0],afterRight[0],'changing key must change direction immediately');
+assert(player[1]<afterRight[1]);
+const beforeStop=[...player];
+moveAssistedCar(0,0,1/60);
+assert.deepEqual(player,beforeStop,'release must stop without drift');
+
 for(let i=0;i<100;i++)moveAssistedCar(0,0,1/60);
-assert(driveState.speed < speed / 10);
+assert.equal(driveState.speed,0);
 vehicleAction();
 assert.equal(driven, null);
 settingsDialog();
@@ -153,3 +172,4 @@ savePosition();
 assert(saved.geoPosition.every(Number.isFinite));
 console.log('Verified immersion settings, all mapped establishments, pixel portraits, grammar gates, C1 review, pedestrian journeys, assisted driving, missions, zoom and persistence.');
 `, env);
+
