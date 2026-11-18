@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="it">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Mondovì · Cidade aberta</title>
+<title>Mondovì · Città aperta</title>
 <style>
 :root{color-scheme:light;--bg:#eee9d9;--paper:#faf5e8;--ink:#283b32;--green:#345b49;--line:#d8cdb6;--brick:#9d4a3d}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px system-ui,sans-serif}
@@ -29,25 +29,29 @@ textarea,input[type=search]{width:100%;padding:9px;border:1px solid #bbac8b;bord
 .mapCanvas{display:block;width:100%;height:auto;margin:10px 0;border-radius:7px;cursor:grab;background:#a6b98f;touch-action:none}.mapCanvas:active{cursor:grabbing}.results{max-height:174px;overflow-y:auto;display:grid;gap:5px;margin-top:7px}.results button{text-align:left}
 .missionCard{border-top:3px solid var(--brick)}.missionCard ol{padding-left:22px;font-size:13px}.missionCard li{padding:3px 0}
 .choices[hidden]{display:none}.visitList{max-height:200px;overflow:auto}
+.portrait{width:80px;height:88px;image-rendering:pixelated;float:left;margin:0 16px 10px 0;border:2px solid #b4a17d;border-radius:9px;background:#c5c9a6}
+.modalHead{clear:both;margin-bottom:12px}.assist{border-top:1px solid var(--line);margin-top:14px;padding-top:10px;clear:both}.assist summary{font-size:12px;cursor:pointer;color:#675a45}
+.utterance{min-height:46px}.challenge{border-left:3px solid #9b6044;padding-left:12px}
+button{transition:background .15s,transform .15s}button:active{transform:translateY(1px)}
 dl{margin:8px 0}dt{font-weight:650;margin-top:8px}dd{margin-left:0;color:#635b4b}
 @media(max-width:780px){main{padding:14px}.layout{grid-template-columns:1fr}aside{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:490px){aside{grid-template-columns:1fr}.toolbar{font-size:12px}main{padding:10px}}
 </style>
 <main>
-<header><div><span class="kicker">RPG de imersão em italiano</span><h1>Mondovì</h1></div><div class="row"><button id="openMissions">Missões</button><button id="openMap">Mapa da cidade</button><button id="openJournal">Caderno</button></div></header>
+<header><div><span class="kicker">Un gioco per vivere in italiano</span><h1>Mondovì</h1></div><div class="row"><button id="openSettings">Impostazioni</button><button id="openMissions">Missioni</button><button id="openMap">Mappa della città</button><button id="openJournal">Taccuino</button></div></header>
 <div class="layout">
-<section class="game" aria-label="Cidade aberta">
-<div class="stage"><canvas id="world" width="620" height="392" aria-label="Jogo em pixel art com a geometria real de Mondovì"></canvas><div id="location" class="location"></div><button id="near" class="near" hidden></button></div>
-<div class="toolbar"><div><kbd>WASD</kbd> andar/dirigir &nbsp; <kbd>E</kbd> interagir &nbsp; <kbd>V</kbd> veículo &nbsp; <kbd>M</kbd> mapa</div><div class="move"><button data-key="ArrowLeft" aria-label="Esquerda">←</button><button data-key="ArrowUp" aria-label="Cima">↑</button><button data-key="ArrowDown" aria-label="Baixo">↓</button><button data-key="ArrowRight" aria-label="Direita">→</button><button id="vehicle">Veículo</button><button class="primary" id="talk">Interagir</button></div></div>
+<section class="game" aria-label="Città aperta">
+<div class="stage"><canvas id="world" width="620" height="392" aria-label="Gioco in pixel art sulla mappa reale di Mondovì"></canvas><div id="location" class="location"></div><button id="near" class="near" hidden></button></div>
+<div class="toolbar"><div><kbd>WASD</kbd> cammina/guida &nbsp; <kbd>E</kbd> interagisci &nbsp; <kbd>V</kbd> auto &nbsp; <kbd>M</kbd> mappa</div><div class="move"><button data-key="ArrowLeft" aria-label="Sinistra">←</button><button data-key="ArrowUp" aria-label="Su">↑</button><button data-key="ArrowDown" aria-label="Giù">↓</button><button data-key="ArrowRight" aria-label="Destra">→</button><button id="vehicle">Auto</button><button class="primary" id="talk">Parla</button></div></div>
 </section>
 <aside>
-<section class="card missionCard"><span class="kicker">Missão acompanhada</span><div id="missionStatus"></div></section>
-<section class="card"><span class="kicker">Altipiano · Breo · Piazza</span><h2>Explore à vontade</h2><p id="navigation">Marque um destino no mapa ou ande até um balão de conversa.</p><button id="clearPin" hidden>Remover destino</button></section>
-<section class="card"><span class="kicker">Conversas na cidade</span><div id="visits" class="visitList"></div></section>
-<section class="card"><span class="kicker">Italiano na prática</span><p id="progress"></p><button id="openSkills">Trilha até C1</button></section>
+<section class="card missionCard"><span class="kicker">Missione attiva</span><div id="missionStatus"></div></section>
+<section class="card"><span class="kicker">Altipiano · Breo · Piazza</span><h2>Esplora liberamente</h2><p id="navigation">Scegli una destinazione sulla mappa o avvicinati a una persona.</p><button id="clearPin" hidden>Rimuovi la destinazione</button></section>
+<section class="card"><span class="kicker">Persone e incontri</span><div id="visits" class="visitList"></div></section>
+<section class="card"><span class="kicker">Italiano nella vita quotidiana</span><p id="progress"></p><button id="openSkills">Percorso verso C1</button></section>
 </aside>
 </div>
-<footer>Ruas, edifícios e locais de interesse do <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a> · <a href="https://www.openstreetmap.org/#map=16/44.3897/7.8242" target="_blank" rel="noopener">ver a cidade no OSM</a> · Personagens e situações fictícios em locais mapeados.</footer>
+<footer>Strade, edifici e luoghi da <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a> · <a href="https://www.openstreetmap.org/#map=16/44.3897/7.8242" target="_blank" rel="noopener">apri la città su OSM</a> · Personaggi e situazioni immaginari in luoghi reali.</footer>
 </main>
 <dialog id="modal" aria-labelledby="modalTitle"></dialog>
 <script>
@@ -56,5 +60,6 @@ dl{margin:8px 0}dt{font-weight:650;margin-top:8px}dd{margin-left:0;color:#635b4b
 /* GAME_CONTENT */
 /* GAME_CODE */
 /* GAME_SYSTEMS */
+/* IMMERSION */
 </script>
 </html>

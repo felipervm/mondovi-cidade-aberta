@@ -104,7 +104,8 @@ const oldPosition=Array.isArray(saved.position)?saved.position:null;
 const restored=Array.isArray(saved.geoPosition)?coord(saved.geoPosition):oldPosition?coord([44.393-oldPosition[1]*.0062/689,7.8175+oldPosition[0]*.0135/1074]):null;
 let player=restored?.every(Number.isFinite)&&canWalk(restored)?restored:restored?.every(Number.isFinite)?arrival(restored):spawn;
 let lastSavedPoint=player;
-let pin=null,trip=null, active=null,turn=0,previous=0,lastPersist=0,priorLabel="";
+let pin=null,trip=null, active=null,turn=0,previous=0,lastPersist=0,priorLabel="",speaker=null;
+let cameraPoint=[...player],frameDelta=0;
 const keys=new Set();
 const zoom=2.68;
 const parkColor={forest:"#71865e",grass:"#a5aa7d",meadow:"#a8ad81",orchard:"#899467",farmland:"#b2a47b",plaza:"#d7c5a4"};
@@ -259,7 +260,9 @@ function marker(context,x,y,text,fill){
 }
 function draw(time,moving){
  const viewW=canvas.width/zoom,viewH=canvas.height/zoom;
- const left=clamp(player[0]-viewW/2,0,city.width-viewW),top=clamp(player[1]-viewH/2,0,city.height-viewH);
+ const follow=1-Math.exp(-frameDelta*9);
+ cameraPoint=cameraPoint.map((value,i)=>value+(player[i]-value)*follow);
+ const left=clamp(cameraPoint[0]-viewW/2,0,city.width-viewW),top=clamp(cameraPoint[1]-viewH/2,0,city.height-viewH);
  const screen=([x,y])=>[(x-left)*zoom,(y-top)*zoom];
  ctx.imageSmoothingEnabled=false;
  ctx.drawImage(terrain,left*raster,top*raster,viewW*raster,viewH*raster,0,0,canvas.width,canvas.height);
@@ -289,7 +292,7 @@ function draw(time,moving){
   ctx.fillStyle="#9e463a";ctx.fillRect(x-2,y-15,4,17);
   ctx.fillStyle="#f3d276";ctx.fillRect(x+2,y-15,11,7);
  }
- const entities=[...actors,...pedestrians.map(p=>({...p,ambient:true})),...(driven?[]:[{point:player,color:"#497588",hero:true}])].sort((a,b)=>a.point[1]-b.point[1]);
+ const entities=[...actors.filter(a=>!a.generic),...pedestrians.map(p=>({...p,ambient:true})),...(driven?[]:[{point:player,color:"#497588",hero:true}])].sort((a,b)=>a.point[1]-b.point[1]);
  entities.forEach(actor=>{
   const [x,y]=screen(actor.point);
   if(x<-30||y<-30||x>canvas.width+30||y>canvas.height+30)return;
@@ -325,6 +328,7 @@ function nearby(){
 }
 function tick(time){
  const dt=Math.min(.033,(time-(previous||time))/1000);
+ frameDelta=dt;
  previous=time;
  let moving=false;
  if(trip&&time-trip.started>=2400){
@@ -333,14 +337,14 @@ function tick(time){
  if(!modal.open&&!trip){
   const pressed=(arrow,letter)=>Number(keys.has(arrow)||keys.has(letter));
   const dx=pressed("ArrowRight","d")-pressed("ArrowLeft","a"),dy=pressed("ArrowDown","s")-pressed("ArrowUp","w");
-  if(dx||dy){
-   const step=(driven?115:38)*dt/Math.hypot(dx,dy);
-   const allowed=driven?driveable:canWalk;
+  if(driven){moving=moveAssistedCar(dx,dy,dt);}
+  else if(dx||dy){
+   const step=38*dt/Math.hypot(dx,dy);
+   const allowed=canWalk;
    const horizontal=[player[0]+dx*step,player[1]];
    if(dx&&allowed(horizontal)){player=horizontal;moving=true;}
    const vertical=[player[0],player[1]+dy*step];
    if(dy&&allowed(vertical)){player=vertical;moving=true;}
-   if(driven&&moving)driveAngle=Math.atan2(dy,dx);
   }
  }
  updateTraffic(dt);
@@ -349,8 +353,8 @@ function tick(time){
  const near=trip?null:nearby(), button=$("near");
  button.hidden=!near||modal.open;
  if(near){
-  const text=near.actor?"E · Falar com "+near.actor.name:near.station?"E · Funicolare / "+near.station.name:near.place?"E · "+near.place[1]:
-   near.driving?"V · Estacionar":near.vehicle?"V · Pegar o carro":"E · Pedir informações";
+  const text=near.actor?"E · Parla con "+near.actor.name:near.station?"E · Funicolare / "+near.station.name:near.place?"E · "+near.place[1]:
+   near.driving?"V · Parcheggia":near.vehicle?"V · Sali in auto":"E · Chiedi informazioni";
   if(button.textContent!==text)button.textContent=text;
  }
  const plaza=nearAreas(player).find(a=>a.name&&polygonContains(player,a.points));
@@ -359,15 +363,16 @@ function tick(time){
  const district=lon<7.819&&lat>44.389?"Altipiano":lon>7.827?"Piazza":"Breo";
  const label=plaza?.name||(street&&street.d<16?street.segment.name:"Mondovì · "+district);
  if(label!==priorLabel){$("location").textContent=label;priorLabel=label;}
- if(pin)$("navigation").textContent=pin.name+" · "+(distance(player,pin.point)<12?"Você chegou":remainingDistance());
+ if(pin)$("navigation").textContent=pin.name+" · "+(distance(player,pin.point)<12?"Sei arrivato":remainingDistance());
  draw(time,moving);
  requestAnimationFrame(tick);
 }
 function modalHeader(label,title){
- return '<div class="modalHead"><div><span class="kicker">'+escapeHtml(label)+'</span><h2 id="modalTitle">'+escapeHtml(title)+'</h2></div><button id="closeModal" aria-label="Fechar">×</button></div>';
+ return '<div class="modalHead"><div><span class="kicker">'+escapeHtml(label)+'</span><h2 id="modalTitle">'+escapeHtml(title)+'</h2></div><button id="closeModal" aria-label="Chiudi">×</button></div>';
 }
 function open(label,title,body){
  keys.clear();modal.innerHTML=modalHeader(label,title)+body;
+ decorateInteraction();
  $("closeModal").onclick=()=>modal.close();
  if(!modal.open)modal.showModal();
  $("closeModal").focus();
@@ -388,11 +393,11 @@ function setPin(point,name){
  pin=point?{point,name}:null;
  refreshRoute(previous,true);
  $("clearPin").hidden=!pin;
- if(!pin)$("navigation").textContent="Marque um destino no mapa ou ande até um balão de conversa.";
+ if(!pin)$("navigation").textContent="Scegli una destinazione sulla mappa o avvicinati a una persona.";
 }
 function updateSidebar(){
- $("progress").textContent=Object.keys(saved.done).length+" de "+actors.length+" situações praticadas nesta versão.";
- $("visits").replaceChildren(...actors.map(actor=>{
+ $("progress").textContent=Object.keys(saved.done).length+" di "+actors.length+" situazioni affrontate.";
+ $("visits").replaceChildren(...actors.filter(actor=>!actor.generic).map(actor=>{
   const button=document.createElement("button");
   button.textContent=(saved.done[actor.id]?"✓ ":"")+actor.level+" · "+actor.title;
   button.onclick=()=>setPin(actor.point,actor.site+" / "+actor.name);
@@ -401,19 +406,20 @@ function updateSidebar(){
 }
 function interact(){
  if(modal.open||trip)return;
+ speaker=null;
  const near=nearby();
- if(!near){open("Esplorazione","Quem está por perto?",'<p>Aproxime-se de um personagem, um comércio marcado ou uma estação para interagir.</p>');return;}
+ if(!near){open("Esplorazione","Chi c’è nei paraggi?",'<p>Avvicinati a una persona, a un’attività o a una stazione per interagiscie.</p>');return;}
  if(near.actor){conversationMenu(near.actor);return;}
  if(near.vehicle||near.driving){vehicleAction();return;}
  if(near.pedestrian){pedestrianTalk();return;}
  if(near.station){
   if(!saved.ticket){
    const giulia=actors.find(a=>a.id==="station");
-   open("Funicolare",near.station.name,'<p>Fale com Giulia na bilheteria de Breo. Você também pode seguir pelas ruas e escadarias a pé.</p><button id="findTicket">Marcar a bilheteria</button>');
+   open("Funicolare",near.station.name,'<p>Parla con Giulia alla biglietteria di Breo. Puoi anche salire a piedi.</p><button id="findTicket">Segna la biglietteria</button>');
    $("findTicket").onclick=()=>{setPin(giulia.point,giulia.site);modal.close();};
   }else{
    const destination=boarding.find(b=>b.name!==near.station.name);
-   open("Funicolare",near.station.name,'<p lang="it">Prossima fermata: '+escapeHtml(destination.name)+'.</p><button class="primary" id="board">Embarcar</button>');
+   open("Funicolare",near.station.name,'<p lang="it">Prossima fermata: '+escapeHtml(destination.name)+'.</p><button class="primary" id="board">Sali</button>');
    $("board").onclick=()=>{modal.close();trip={from:near.station.name,destination,started:previous};};
   }
   return;
@@ -422,21 +428,21 @@ function interact(){
  saved.visited[id]=true;persist();
  const resident=actors.find(actor=>actor.place===id);
  const details=city.featured[id];
- open(typeNames[kind]||"Local mapeado",name,(details?'<p>'+escapeHtml(details[0])+'</p><p><a target="_blank" rel="noopener" href="'+details[1]+'">Fonte do endereço ↗</a></p>':'<p>Você está neste local do mapa.</p>')+(resident?'<button id="findResident">Marcar '+escapeHtml(resident.name)+'</button>':'')+
-  '<p><a target="_blank" rel="noopener" href="'+osmLink(point)+'">Ver no OpenStreetMap ↗</a></p>');
+ open(typeNames[kind]||"Luogo",name,(details?'<p>'+escapeHtml(details[0])+'</p><p><a target="_blank" rel="noopener" href="'+details[1]+'">Fonte dell’indirizzo ↗</a></p>':'<p>Sei arrivato qui.</p>')+(resident?'<button id="findResident">Segna '+escapeHtml(resident.name)+'</button>':'')+
+  '<p><a target="_blank" rel="noopener" href="'+osmLink(point)+'">Apri su OpenStreetMap ↗</a></p>');
  if(resident)$("findResident").onclick=()=>{setPin(resident.point,resident.name);modal.close();};
 }
 function startEncounter(actor){
- active=actor;turn=0;
+ active=actor;speaker=actor;turn=0;
  if(actor.brief){mediation();return;}
  renderTurn();
 }
 function renderTurn(){
  const t=active.turns[turn];
  open(active.site+" · "+active.level,active.name,
-  '<p class="utterance" lang="it">'+escapeHtml(t.line)+'</p><div class="row"><button id="listen">♪ Ouvir</button><button id="showHint" aria-expanded="false">Pista</button><button id="showChoices" aria-expanded="'+(active.level==="A1")+'">Respostas sugeridas</button></div>'+
-  '<p class="note" id="hint" hidden>'+escapeHtml(t.hint)+'</p><div class="choices" id="choices" '+(active.level==="A1"?"":"hidden style='display:none'")+'></div>'+
-  '<form id="answerForm"><label for="answer">Responda em italiano</label><textarea id="answer" lang="it" required></textarea><button class="primary">Responder</button></form><p class="note" id="reaction" role="status" hidden></p>');
+  '<p class="utterance" lang="it">'+escapeHtml(t.line)+'</p><div class="row"><button id="listen">♪ Ascolta</button><button id="showHint" aria-expanded="false">Indizio</button><button id="showChoices" aria-expanded="false">Risposte suggerite</button></div>'+
+  '<p class="note" id="hint" hidden>'+escapeHtml(t.hint)+'</p><div class="choices" id="choices" hidden style="display:none"></div>'+
+  '<form id="answerForm"><label for="answer">Rispondi in italiano</label><textarea id="answer" lang="it" required></textarea><button class="primary">Rispondi</button></form><p class="note" id="reaction" role="status" hidden></p>');
  $("listen").onclick=()=>speak(t.line);toggle($("showHint"),$("hint"));
  const choices=$("choices");
  $("showChoices").onclick=()=>{
@@ -464,47 +470,62 @@ function renderTurn(){
 }
 function retry(t,typed=false){
  const p=$("reaction");p.hidden=false;
- p.textContent=t.retry+(typed?" Tente outra formulação ou abra as respostas sugeridas.":" "+t.feedback);
+ p.textContent=t.retry+(typed?" Prova a riformulare oppure consulta le risposte suggerite.":" "+t.feedback);
 }
 function remember([it,pt]){
  saved.phrases[it] ||= {pt,due:Date.now()+60000,stage:0};
+ saved.phrases[it].it ||= active?.turns?.[turn]?.feedback||"Riprendi questa espressione in una nuova frase, cambiando persona o tempo.";
 }
-function finishTurn(t,original=""){
+function finishTurn(t,original="",checked=false){
+ if(!checked&&turn+1===active.turns.length&&saved.settings.challenge){
+  grammarChallenge(active,()=>finishTurn(t,original,true));return;
+ }
  const finalTurn=turn+1===active.turns.length;
  let nextMission="";
  remember(t.memory);
  if(finalTurn){
-  saved.done[active.id]=original?"comparação com modelo":"diálogo";
+  saved.done[active.id]=original?"confronto con esempio":"dialogo";
   if(active.id==="station")saved.ticket=true;
   nextMission=advanceMission(active.id);
  }
  persist();updateSidebar();
  open(active.site+" · "+active.level,active.name,
-  (original?'<p><strong>Sua resposta</strong></p><p lang="it">'+escapeHtml(original)+'</p><p><strong>Uma resposta possível</strong></p><p lang="it">'+escapeHtml(t.replies[t.answer])+'</p><p class="small">Compare a intenção e o registro. Esta resposta aberta foi registrada para revisão, sem correção automática.</p>':'')+
+  (original?'<p><strong>La tua risposta</strong></p><p lang="it">'+escapeHtml(original)+'</p><p><strong>Una risposta possibile</strong></p><p lang="it">'+escapeHtml(t.replies[t.answer])+'</p><p class="small">Confronta l’intenzione e il registro. La risposta aperta è salvata per la revisione personale.</p>':'')+
   '<p class="utterance" lang="it">'+escapeHtml(t.reply)+'</p><p class="note">'+escapeHtml(t.feedback)+'</p>'+nextMission+
-  '<div class="row"><button id="listen">♪ Ouvir</button><button class="primary" id="advance">'+(finalTurn?"Voltar à rua":"Continuar")+'</button></div>');
+  '<div class="row"><button id="listen">♪ Ascolta</button><button class="primary" id="advance">'+(finalTurn?"Torna in strada":"Continua")+'</button></div>');
  $("listen").onclick=()=>speak(t.reply);
  $("advance").onclick=()=>{if(finalTurn)modal.close();else{turn++;renderTurn();}};
 }
 function mediation(){
  const a=active;
  open(a.site+" · C1",a.title,'<p>'+escapeHtml(a.brief)+'</p>'+
-  a.voices.map(([name,line],i)=>'<p><strong>'+escapeHtml(name)+'</strong> <button data-voice="'+i+'">♪ Ouvir</button></p>'+
-   (a.audioFirst?'<details><summary>Ver transcrição</summary><p lang="it">'+escapeHtml(line)+'</p></details>':'<p lang="it">'+escapeHtml(line)+'</p>')).join("")+
-  '<form id="writing"><label for="draft">Sua mensagem em italiano</label><textarea id="draft" lang="it" rows="5" required>'+escapeHtml(saved.drafts[a.id]||"")+'</textarea><div class="row"><button type="button" id="saveDraft">Salvar rascunho</button><button class="primary">Comparar com modelo</button></div><p class="small" id="draftStatus" role="status"></p></form>');
+  a.voices.map(([name,line],i)=>'<p><strong>'+escapeHtml(name)+'</strong> <button data-voice="'+i+'">♪ Ascolta</button></p>'+
+   (a.audioFirst?'<details><summary>Mostra la trascrizione</summary><p lang="it">'+escapeHtml(line)+'</p></details>':'<p lang="it">'+escapeHtml(line)+'</p>')).join("")+
+  '<form id="writing"><label for="draft">Il tuo messaggio in italiano</label><textarea id="draft" lang="it" rows="5" required>'+escapeHtml(saved.drafts[a.id]||"")+'</textarea><div class="row"><button type="button" id="saveDraft">Salva la bozza</button><button class="primary">Confronta con un esempio</button></div><p class="small" id="draftStatus" role="status"></p></form>');
  modal.querySelectorAll("[data-voice]").forEach(button=>button.onclick=()=>speak(a.voices[button.dataset.voice][1]));
- $("saveDraft").onclick=()=>{saved.drafts[a.id]=$("draft").value;persist();$("draftStatus").textContent="Rascunho salvo."};
+ $("saveDraft").onclick=()=>{saved.drafts[a.id]=$("draft").value;persist();$("draftStatus").textContent="Bozza salvata."};
  $("writing").onsubmit=e=>{
   e.preventDefault();
   const draft=$("draft").value.trim();if(!draft)return;
-  saved.drafts[a.id]=draft;saved.done[a.id]="comparação com modelo";const nextMission=advanceMission(a.id);persist();updateSidebar();
-  open(a.site+" · C1","Releia sua síntese",
-   '<h3>Sua mensagem</h3><p lang="it" style="white-space:pre-wrap">'+escapeHtml(draft)+'</p><h3>Uma versão possível</h3><p lang="it">'+escapeHtml(a.model)+'</p><button id="listen">♪ Ouvir o modelo</button>'+
-   '<p>Use estes critérios para revisar seu texto:</p><ul>'+a.criteria.map(item=>"<li>"+escapeHtml(item)+"</li>").join("")+'</ul>'+nextMission+'<button class="primary" id="rewrite">Revisar minha mensagem</button>');
+  const minimum=a.audioFirst?60:90;
+  if(draft.split(/\s+/).length<minimum){
+   $("draftStatus").textContent="Sviluppa il ragionamento in almeno "+minimum+" parole. Riprendi entrambe le prospettive e motiva la proposta.";return;
+  }
+  saved.drafts[a.id]=draft;persist();
+  open(a.site+" · C1","Rileggi la tua sintesi",
+   '<h3>Il tuo messaggio</h3><p lang="it" style="white-space:pre-wrap">'+escapeHtml(draft)+'</p><h3>Una versione possibile</h3><p lang="it">'+escapeHtml(a.model)+'</p><button id="listen">♪ Ascolta l’esempio</button>'+
+   '<p>Rivedi il testo usando questi criteri.</p><form id="selfReview">'+a.criteria.map((item,i)=>'<p><label><input type="checkbox" id="criterion'+i+'" required> '+escapeHtml(item)+'</label></p>').join("")+
+   '<button class="primary">Conferma la revisione</button></form><button id="rewrite">Rivedi il messaggio</button>');
   $("listen").onclick=()=>speak(a.model);$("rewrite").onclick=mediation;
+  $("selfReview").onsubmit=e=>{
+   e.preventDefault();
+   if(!a.criteria.every((_,i)=>$("criterion"+i).checked))return;
+   saved.done[a.id]="autovalutazione";const nextMission=advanceMission(a.id);persist();updateSidebar();
+   open(a.site,"Revisione completata",'<p>Hai confrontato il tuo testo con i criteri. Continua a riformulare con parole tue.</p>'+nextMission);
+  };
  };
 }
-const typeNames={cafe:"Café",bar:"Bar",restaurant:"Restaurante",pharmacy:"Farmácia",marketplace:"Mercado",books:"Livraria",museum:"Museu",clothes:"Roupas",butcher:"Açougue",bank:"Banco",hotel:"Hotel",guest_house:"Hospedagem",theatre:"Teatro",townhall:"Prefeitura",supermarket:"Supermercado",pastry:"Confeitaria"};
+const typeNames={cafe:"Caffè",bar:"Bar",restaurant:"Ristorante",pharmacy:"Farmacia",marketplace:"Mercato",books:"Libreria",museum:"Museo",clothes:"Abbigliamento",butcher:"Macelleria",bank:"Banca",hotel:"Hotel",guest_house:"Alloggio",theatre:"Teatro",townhall:"Municipio",supermarket:"Supermercato",pastry:"Pasticceria"};
 function osmLink([x,y]){
  const [lat,lon]=geographic([x,y]).map(number=>number.toFixed(6));
  return "https://www.openstreetmap.org/?mlat="+lat+"&mlon="+lon+"#map=19/"+lat+"/"+lon;
@@ -513,24 +534,25 @@ const mapItems=new Map();
 city.roads.forEach(([name,,points])=>{
  if(name&&!mapItems.has("street:"+name)){
   const p=points[Math.floor(points.length/2)];
-  if(p[0]>=0&&p[0]<=city.width&&p[1]>=0&&p[1]<=city.height)mapItems.set("street:"+name,{name,kind:"Rua",point:p});
+  if(p[0]>=0&&p[0]<=city.width&&p[1]>=0&&p[1]<=city.height)mapItems.set("street:"+name,{name,kind:"Via",point:p});
  }
 });
 areas.filter(a=>a.kind==="plaza"&&a.name).forEach(a=>{
- const [l,t,r,b]=a.box;mapItems.set("street:"+a.name,{name:a.name,kind:"Praça",point:[(l+r)/2,(t+b)/2]});
+ const [l,t,r,b]=a.box;mapItems.set("street:"+a.name,{name:a.name,kind:"Piazza",point:[(l+r)/2,(t+b)/2]});
 });
 city.places.forEach(([id,name,kind,point])=>{if(name)mapItems.set(id,{name,kind:typeNames[kind]||kind,point,address:city.featured[id]?.[0]});});
-boarding.forEach(({name,point})=>mapItems.set("station-"+name,{name:"Funicolare · "+name,kind:"Estação",point}));
+boarding.forEach(({name,point})=>mapItems.set("station-"+name,{name:"Funicolare · "+name,kind:"Stazione",point}));
 const altipiano=actors.find(actor=>actor.id==="altipiano");
-mapItems.set("altipiano",{name:altipiano.site,kind:"Estação ferroviária",point:altipiano.point});
+mapItems.set("altipiano",{name:altipiano.site,kind:"Stazione ferroviaria",point:altipiano.point});
 const collator=new Intl.Collator("it");
 const directory=[...mapItems.values()].sort((a,b)=>collator.compare(a.name,b.name));
 function mapDialog(){
+ speaker=null;
  open("Cartografia · OpenStreetMap","Mapa de Mondovì",
-  '<label for="mapSearch">Buscar rua, praça ou comércio mapeado</label><input type="search" id="mapSearch" placeholder="Via Sant’Agostino, libreria, Piazza…">'+
-  '<div class="row" style="margin-top:8px"><button id="zoomIn" aria-label="Aproximar mapa">+</button><button id="zoomOut" aria-label="Afastar mapa">−</button><button id="centerMap">Minha posição</button><button id="resetMap">Mapa inteiro</button></div>'+
-  '<canvas width="620" height="'+Math.round(620*city.height/city.width)+'" id="overview" class="mapCanvas" aria-label="Mapa de Altipiano, Breo e Piazza. Use a busca para navegar pelo teclado."></canvas>'+
-  '<p id="mapLegend" class="small">Azul = você · Vermelho = personagem · Verde = veículo. Arraste para mover o mapa ou clique para marcar um destino.</p><div class="results" id="results" aria-label="Locais mapeados"></div>');
+  '<label for="mapSearch">Cerca una via, una piazza o un’attività</label><input type="search" id="mapSearch" placeholder="Via Sant’Agostino, libreria, Piazza…">'+
+  '<div class="row" style="margin-top:8px"><button id="zoomIn" aria-label="Ingrandisci">+</button><button id="zoomOut" aria-label="Riduci">−</button><button id="centerMap">La mia posizione</button><button id="resetMap">Mappa completa</button></div>'+
+  '<canvas width="620" height="'+Math.round(620*city.height/city.width)+'" id="overview" class="mapCanvas" aria-label="Mappa di Altipiano, Breo e Piazza. Usa la ricerca per scegliere una destinazione."></canvas>'+
+  '<p id="mapLegend" class="small">Blu = tu · Rosso = persona · Verde = auto. Trascina la mappa o tocca una destinazione.</p><div class="results" id="results" aria-label="Locais mapeados"></div>');
  const overview=$("overview"),g=overview.getContext("2d");
  const sx=overview.width/city.width,sy=overview.height/city.height;
  let scale=1,left=0,top=0,drag=null;
@@ -577,7 +599,7 @@ function mapDialog(){
   left=drag.left-(p[0]-drag.at[0])/(sx*scale);top=drag.top-(p[1]-drag.at[1])/(sy*scale);constrain();drawMap();
  };
  overview.onpointerup=e=>{
-  if(drag&&!drag.moved){setPin(viewPoint(localPoint(e)),"Ponto no mapa");drawMap();}
+  if(drag&&!drag.moved){setPin(viewPoint(localPoint(e)),"Punto sulla mappa");drawMap();}
   drag=null;
  };
  overview.onpointercancel=()=>{drag=null;};
@@ -594,28 +616,33 @@ function mapDialog(){
    const button=document.createElement("button");button.textContent=item.name+" · "+(item.address||item.kind);
    button.onclick=()=>{setPin(item.point,item.name);centerMap(item.point,Math.max(3,scale));};return button;
   }));
-  if(!found.length)$("results").textContent="Nenhum local no recorte atual.";
+  if(!found.length)$("results").textContent="Nessun luogo trovato.";
  };
  search.oninput();search.focus();
 }
 function journal(){
+ speaker=null;
  const entries=Object.entries(saved.phrases);
  const due=entries.find(([,record])=>record.due<=Date.now());
- open("Revisão espaçada","Caderno de viagem",
-  (entries.length?'<p>'+entries.length+' expressões encontradas.</p>':'<p>Converse pela cidade para guardar suas primeiras expressões.</p>')+
-  (due?'<button class="primary" id="review">Tentar lembrar uma frase</button>':'')+'<dl id="phrases"></dl>');
+ open("Ripasso dilazionato","Taccuino di viaggio",
+  (entries.length?'<p>'+entries.length+' espressioni incontrate.</p>':'<p>Parla con le persone per raccogliere le prime espressioni.</p>')+
+  (due?'<button class="primary" id="review">Prova a ricordare una frase</button>':'')+'<dl id="phrases"></dl>');
  entries.forEach(([it,record])=>{
   const dt=document.createElement("dt"),dd=document.createElement("dd"),button=document.createElement("button");
-  dt.lang="it";dt.textContent=it+" ";dd.textContent=record.pt;
-  button.textContent="♪";button.setAttribute("aria-label","Ouvir "+it);button.onclick=()=>speak(it);
+  dt.lang="it";dt.textContent=it+" ";dd.textContent=record.it||"Riformula l’espressione in un contesto diverso.";
+  if(saved.settings.portuguese){
+   const help=document.createElement("details"),summary=document.createElement("summary"),p=document.createElement("p");
+   summary.textContent="Aiuto in portoghese";p.lang="pt-BR";p.textContent=record.pt;help.append(summary,p);dd.append(help);
+  }
+  button.textContent="♪";button.setAttribute("aria-label","Ascolta "+it);button.onclick=()=>speak(it);
   dt.append(button);$("phrases").append(dt,dd);
  });
  if(due)$("review").onclick=()=>review(due);
 }
 function review([it,record]){
- open("Revisão espaçada","Como você diria?",
-  '<p>'+escapeHtml(record.pt)+'</p><label for="recall">Escreva ou diga em voz alta</label><textarea id="recall" lang="it"></textarea><button id="reveal">Ver a expressão</button>'+
-  '<div id="recallResult" hidden><p class="utterance" lang="it">'+escapeHtml(it)+'</p><div class="row"><button id="again">Quero rever logo</button><button class="primary" id="remembered">Lembrei da ideia</button></div></div>');
+ open("Ripasso dilazionato","Come lo diresti?",
+  '<p>'+escapeHtml(record.it||"Ripensa a una frase incontrata in città. Prova a riformularla.")+'</p><label for="recall">Scrivi o prova a voce alta</label><textarea id="recall" lang="it"></textarea><button id="reveal">Mostra l’espressione</button>'+
+  '<div id="recallResult" hidden><p class="utterance" lang="it">'+escapeHtml(it)+'</p><div class="row"><button id="again">Da rivedere presto</button><button class="primary" id="remembered">Ho ricordato il senso</button></div></div>');
  $("reveal").onclick=()=>{$("recallResult").hidden=false;};
  function schedule(ok){
   record.stage=ok?Math.min(record.stage+1,4):0;
@@ -625,13 +652,15 @@ function review([it,record]){
  $("again").onclick=()=>schedule(false);$("remembered").onclick=()=>schedule(true);
 }
 function skillsDialog(){
- open("Quadro Europeu Comum de Referência","A trilha até C1",
-  '<p>Você pode praticar em qualquer ordem. Cada situação treina parte do nível indicado.</p><dl>'+
+ speaker=null;
+ open("Quadro Europeu Comum de Referência","Il percorso verso C1",
+  '<p>Puoi esercitarti nell’ordine che preferisci. Ogni situazione allena alcune competenze del livello indicato.</p><dl>'+
   skills.map(([level,description])=>{
    const relevant=actors.filter(a=>a.level===level);
-   return '<dt>'+level+'</dt><dd>'+escapeHtml(description)+' '+relevant.filter(a=>saved.done[a.id]).length+'/'+relevant.length+' situações praticadas.</dd>';
-  }).join("")+'</dl><p>O cenário C1 atual tem resposta escrita e autoavaliação com modelo. A trilha completa também precisa de prática oral, escuta longa e revisão de respostas livres.</p>'+
-  '<a target="_blank" rel="noopener" href="https://www.coe.int/en/web/common-european-framework-reference-languages/cefr-descriptors">Descritores do Conselho da Europa ↗</a>');
+   return '<dt>'+level+'</dt><dd>'+escapeHtml(description)+' '+relevant.filter(a=>saved.done[a.id]).length+'/'+relevant.length+' situazioni affrontate.</dd>';
+  }).join("")+'</dl><p>Le attività C1 propongono mediazione, inferenze e registro. Le risposte libere si rivedono con esempi e criteri. Il percorso richiede anche pratica orale e ascolto prolungato.</p>'+
+  '<p><a target="_blank" rel="noopener" href="https://www.coe.int/en/web/common-european-framework-reference-languages/cefr-descriptors">Descrittori del Consiglio d’Europa ↗</a></p>'+
+  '<p>Parlato e varietà regionali — <a target="_blank" rel="noopener" href="https://www.treccani.it/vocabolario/cerea/">cerea</a> · <a target="_blank" rel="noopener" href="https://www.treccani.it/enciclopedia/intensificatori_%28Enciclopedia-dell%27Italiano%29/">mica</a></p>');
 }
 const movement=["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","w","a","s","d"];
 window.addEventListener("keydown",e=>{

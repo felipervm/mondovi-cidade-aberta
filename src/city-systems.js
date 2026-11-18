@@ -1,12 +1,12 @@
 const missions = [
- {id:"benvenuto",name:"Uma tarde em Breo",level:"A1–A2",brief:"Lucia prepara você para encontrar os outros lugares do bairro.",
-  steps:[["coffee","Peça um espresso e decida onde beber."],["aragno","Vá ao Corso Statuto, 26 e peça uma recomendação de doce."],["moro","Siga até a Piazza San Pietro e peça uma mesa ao ar livre."]]},
- {id:"cena",name:"Um jantar para dois",level:"B1–B2",brief:"Resolva um imprevisto na reserva e combine uma alternativa.",
-  steps:[["restaurant","Encontre Marta na Cantina Bonaparte e negocie a reserva."],["square","Conte a Paolo como você fez o trajeto até Piazza Maggiore."],["donalfo","Volte à Piazza Cesare Battisti e combine como dividir a pizza."]]},
- {id:"partenza",name:"Da colina à estação",level:"A2–B1",brief:"Pratique resolver um deslocamento do bilhete à baldeação.",
-  steps:[["station","Peça a Giulia um bilhete de ida para Piazza."],["books","Na Libreria Confabula, encontre um presente para levar."],["altipiano","Vá à Piazza Franco Centro e ajude Matteo a confirmar o trem."]]},
- {id:"piazza",name:"O futuro da praça",level:"B2–C1",brief:"Observe o mercado, ouça interesses diferentes e faça uma proposta.",
-  steps:[["market","Converse com Elena no mercado."],["mediation","Ouça a ambulante e o morador e redija uma proposta para testar."],["interview","Vá à Piazza Monteregale e defenda sua proposta em uma entrevista."]]}
+ {id:"benvenuto",name:"Un pomeriggio a Breo",level:"A1–A2",brief:"Parti dal bar e scopri le altre attività del quartiere.",
+  steps:[["coffee","Ordina un espresso e decidi dove berlo."],["aragno","Raggiungi corso Statuto 26 e chiedi un consiglio sui dolci."],["moro","Vai in piazza San Pietro e chiedi un tavolo all’aperto."]]},
+ {id:"cena",name:"Una cena per due",level:"B1–B2",brief:"Risolvi un imprevisto con la prenotazione e concorda un’alternativa.",
+  steps:[["restaurant","Incontra Marta alla Cantina Bonaparte e chiarisci la prenotazione."],["square","Racconta a Paolo come hai raggiunto piazza Maggiore."],["donalfo","Torna in piazza Cesare Battisti e ordina una pizza da dividere."]]},
+ {id:"partenza",name:"Dalla collina alla stazione",level:"A2–B1",brief:"Organizza il viaggio, dal biglietto alla coincidenza.",
+  steps:[["station","Chiedi a Giulia un biglietto di sola andata per Piazza."],["books","Alla Libreria Confabula scegli un regalo da portare con te."],["altipiano","Raggiungi piazza Franco Centro e aiuta Matteo a controllare il treno."]]},
+ {id:"piazza",name:"Il futuro della piazza",level:"B2–C1",brief:"Visita il mercato, ascolta esigenze diverse e formula una proposta.",
+  steps:[["market","Parla con Elena al mercato."],["mediation","Ascolta l’ambulante e il residente e proponi una sperimentazione."],["interview","Vai in piazza Monteregale e difendi la tua proposta in un’intervista."]]}
 ];
 saved.missions ||= {};
 let tracked=missions.find(m=>m.id===saved.tracked)||null;
@@ -21,24 +21,25 @@ function trackMission(m){
 function renderMissionStatus(){
  const panel=$("missionStatus");
  if(!tracked){
-  panel.innerHTML='<p>Escolha uma missão para ver seu primeiro destino.</p><button id="chooseMission">Escolher missão</button>';
+  panel.innerHTML='<p>Scegli una missione per scoprire la prima destinazione.</p><button id="chooseMission">Scegli una missione</button>';
   $("chooseMission").onclick=missionDialog;return;
  }
  const i=missionStep(tracked),step=tracked.steps[i],actor=step&&actorById(step[0]);
- panel.innerHTML='<h3>'+escapeHtml(tracked.name)+'</h3><p>'+i+'/'+tracked.steps.length+' etapas</p>'+
-  (step?'<p>'+escapeHtml(step[1])+'</p><button id="missionPin">Mostrar destino</button>':'<p>Missione compiuta!</p><button id="missionPin">Escolher outra</button>');
+ panel.innerHTML='<h3>'+escapeHtml(tracked.name)+'</h3><p>'+i+'/'+tracked.steps.length+' tappe</p>'+
+  (step?'<p>'+escapeHtml(step[1])+'</p><button id="missionPin">Mostra la destinazione</button>':'<p>Missione compiuta!</p><button id="missionPin">Scegline un’altra</button>');
  $("missionPin").onclick=()=>{
   if(actor){setPin(actor.point,actor.site+" / "+actor.name);mapDialog();}else missionDialog();
  };
 }
 function missionDialog(){
- open("Diario delle missioni","Missões de Mondovì",'<p>Você pode acompanhar uma missão e conversar com qualquer personagem pelo caminho.</p><div id="missionList" class="choices"></div>');
+ speaker=null;
+ open("Diario delle missioni","Missioni di Mondovì",'<p>Segui una missione e parla con chi incontri lungo il percorso.</p><div id="missionList" class="choices"></div>');
  missions.forEach(m=>{
   const step=missionStep(m),article=document.createElement("article");
   article.className="note";
   article.innerHTML='<h3>'+escapeHtml(m.name)+' <span class="pill">'+m.level+'</span></h3><p>'+escapeHtml(m.brief)+'</p><ol>'+
    m.steps.map(([,task],i)=>'<li>'+(i<step?"✓ ":"")+escapeHtml(task)+'</li>').join("")+'</ol>';
-  const button=document.createElement("button");button.textContent=step===m.steps.length?"Missão concluída":step?"Continuar missão":"Acompanhar missão";
+  const button=document.createElement("button");button.textContent=step===m.steps.length?"Missione conclusa":step?"Continua la missione":"Segui la missione";
   button.disabled=step===m.steps.length;
   button.onclick=()=>{trackMission(m);modal.close();};article.append(button);$("missionList").append(article);
  });
@@ -50,33 +51,37 @@ function advanceMission(id){
  if(next)setPin(next.point,next.site+" / "+next.name);
  else setPin(null);
  persist();renderMissionStatus();
- return next?'<p class="note"><strong>Próxima etapa</strong> · '+escapeHtml(tracked.steps[missionStep(tracked)][1])+' O destino foi marcado no mapa.</p>':
+ return next?'<p class="note"><strong>Prossima tappa</strong> · '+escapeHtml(tracked.steps[missionStep(tracked)][1])+' La destinazione è segnata sulla mappa.</p>':
   '<p class="note"><strong>Missione compiuta!</strong> · '+escapeHtml(tracked.name)+'</p>';
 }
 const shopTopics={
  moro:[
-  ["Pedir para repetir","Scusi, potrebbe ripetere più lentamente?","Certo. Le chiedevo se preferisce stare dentro o fuori."],
-  ["Perguntar pelo próximo lugar","Da qui, come arrivo al Gran Caffè Aragno?","Torni verso il centro di Breo e cerchi corso Statuto. Il caffè è al numero ventisei.","aragno"]
+  ["Chiedere di ripetere","Scusi, potrebbe ripetere più lentamente?","Certo. Le chiedevo se preferisce stare dentro o fuori."],
+  ["Chiedere del prossimo posto","Da qui, come arrivo al Gran Caffè Aragno?","Torni verso il centro di Breo e cerchi corso Statuto. Il caffè è al numero ventisei.","aragno"]
  ],
  aragno:[
-  ["Pedir uma recomendação menos doce","Se volessi qualcosa di meno dolce, che cosa mi consiglierebbe?","Le chiederei prima se preferisce qualcosa di fresco o un biscotto da accompagnare al caffè."],
-  ["Perguntar pelo Bar del Moro","Il Moro Cafè è lontano da qui?","No, vada verso piazza San Pietro. Lo trova proprio sulla piazza.","moro"]
+  ["Chiedere qualcosa di meno dolce","Se volessi qualcosa di meno dolce, che cosa mi consiglierebbe?","Le chiederei prima se preferisce qualcosa di fresco o un biscotto da accompagnare al caffè."],
+  ["Chiedere del Moro Cafè","Il Moro Cafè è lontano da qui?","No, vada verso piazza San Pietro. Lo trova proprio sulla piazza.","moro"]
  ],
  donalfo:[
-  ["Pedir contas separadas","Scusi, sarebbe possibile fare due conti separati?","Sì. Mi dice che cosa ha preso ciascuno?"],
-  ["Esclarecer um mal-entendido","Mi sono spiegato male: volevamo una pizza in tutto, non una a testa.","Ah, ho capito. Allora la portiamo già tagliata, così potete dividerla."]
+  ["Chiedere conti separati","Scusi, sarebbe possibile fare due conti separati?","Sì. Mi dice che cosa ha preso ciascuno?"],
+  ["Chiarire un equivoco","Mi sono spiegato male: volevamo una pizza in tutto, non una a testa.","Ah, ho capito. Allora la portiamo già tagliata, così potete dividerla."]
  ]
 };
 function conversationMenu(actor){
+ speaker=actor;
  const topics=shopTopics[actor.id]||[];
  const next=tracked?.steps[missionStep(tracked)]?.[0];
  open(actor.site,actor.name,'<p class="utterance" lang="it">Buongiorno! Mi dica.</p><div id="topics" class="choices"></div>');
  const button=(label,action)=>{
   const item=document.createElement("button");item.textContent=label;item.onclick=action;$("topics").append(item);
  };
- button((next===actor.id?"Missão · ":"")+actor.title,()=>startEncounter(actor));
+ button((next===actor.id?"Missione · ":"")+actor.title,()=>startEncounter(actor));
  topics.forEach(([title,line,reply,target])=>button(title,()=>ambientDialog(actor.name,line,reply,actorById(target),()=>conversationMenu(actor))));
- button("Perguntar como chegar a outro lugar",()=>{
+ button("Mettermi alla prova · lingua e registro",()=>grammarChallenge(actor,()=>conversationMenu(actor)));
+ button("Una richiesta imprevista",()=>situationalPractice(actor));
+ button("Capire il parlato quotidiano",()=>expressionPractice(actor));
+ button("Chiedere indicazioni",()=>{
   const destination=actorById(next===actor.id?undefined:next)||actorById(actor.id==="altipiano"?"moro":"altipiano");
   ambientDialog(actor.name,"Mi scusi, come posso arrivarci?",
    destination.id==="altipiano"?"Cerchi piazza Franco Centro, all’Altipiano. La stazione è lì.":
@@ -85,9 +90,9 @@ function conversationMenu(actor){
 }
 function ambientDialog(name,line,reply,destination,back){
  open("Conversazione",name,'<p lang="it">'+escapeHtml(line)+'</p><p class="utterance" lang="it">'+escapeHtml(reply)+'</p>'+
-  '<div class="row"><button id="hearQuestion">♪ Ouvir pergunta</button><button id="hearReply">♪ Ouvir resposta</button>'+
-  (destination?'<button class="primary" id="markReply">Marcar '+escapeHtml(destination.site)+'</button>':'')+
-  (back?'<button id="backTopic">Outros assuntos</button>':'')+'</div>');
+  '<div class="row"><button id="hearQuestion">♪ Ascolta la domanda</button><button id="hearReply">♪ Ascolta la risposta</button>'+
+  (destination?'<button class="primary" id="markReply">Segna '+escapeHtml(destination.site)+'</button>':'')+
+  (back?'<button id="backTopic">Altri argomenti</button>':'')+'</div>');
  $("hearQuestion").onclick=()=>speak(line);$("hearReply").onclick=()=>speak(reply);
  if(destination)$("markReply").onclick=()=>{setPin(destination.point,destination.site+" / "+destination.name);modal.close();};
  if(back)$("backTopic").onclick=back;
@@ -166,8 +171,8 @@ function refreshRoute(time,force=false){
 }
 function remainingDistance(){
  const p=navigationRoute;
- if(!p)return Math.round(distance(player,pin.point))+" m em linha reta";
- return Math.round(distance(player,p[1])+p.slice(2).reduce((sum,point,i)=>sum+distance(point,p[i+1]),0))+" m pela rota";
+ if(!p)return Math.round(distance(player,pin.point))+" m in linea d’aria";
+ return Math.round(distance(player,p[1])+p.slice(2).reduce((sum,point,i)=>sum+distance(point,p[i+1]),0))+" m lungo il percorso";
 }
 
 const nearestDrivePoint=(p,radius=95)=>{
@@ -184,7 +189,7 @@ const parked=[
  {point:nearestDrivePoint(actorById("altipiano").point),name:"Altipiano · Stazione"},
  {point:nearestDrivePoint(actorById("square").point),name:"Piazza · Centro storico"}
 ].filter(v=>v.point);
-let driven=null,driveAngle=0;
+let driven=null,driveAngle=0,driveState=null;
 function driveable(p){
  return canWalk(p)&&nearStreets(p).some(s=>s.motor&&distance(p,nearestOn(p,s.a,s.b))<Math.max(2,roadWidth(s.kind)/2-1));
 }
@@ -192,14 +197,16 @@ const nearVehicle=()=>parked.find(v=>distance(player,v.point)<19);
 function vehicleAction(){
  if(trip||modal.open)return;
  if(driven){
-  driven.point=player;driven=null;savePosition();refreshRoute(previous,true);return;
+  driven.point=player;driven=null;driveState=null;savePosition();refreshRoute(previous,true);return;
  }
  const vehicle=nearVehicle();
- if(vehicle){driven=vehicle;player=vehicle.point;refreshRoute(previous,true);return;}
+ if(vehicle){
+  driven=vehicle;player=vehicle.point;driveState=attachCar(player);refreshRoute(previous,true);return;
+ }
  const closest=[...parked].sort((a,b)=>distance(player,a.point)-distance(player,b.point))[0];
- open("Veicoli","Carro compartilhado",'<p>Aproxime-se de um carro marcado com V e pressione V para dirigir. Use V novamente para estacionar e continuar a pé.</p>'+
-  (closest?'<button id="findVehicle" class="primary">Marcar carro mais próximo</button>':''));
- if(closest)$("findVehicle").onclick=()=>{setPin(closest.point,closest.name+" / Veículo");modal.close();};
+ open("Veicoli","Auto condivisa",'<p>Avvicinati a un’auto con il simbolo V. Premi V per salire o scendere. Usa le frecce per scegliere la direzione, la guida assistita segue la strada.</p>'+
+  (closest?'<button id="findVehicle" class="primary">Segna l’auto più vicina</button>':''));
+ if(closest)$("findVehicle").onclick=()=>{setPin(closest.point,closest.name+" / Auto");modal.close();};
 }
 function drawPlayerVehicle(screen){
  parked.forEach(v=>{
@@ -218,27 +225,48 @@ function drawVehicleIcon(x,y,angle,color){
  ctx.fillStyle="#eed8a0";ctx.fillRect(6,-3,2,1);ctx.fillRect(6,2,2,1);ctx.restore();
 }
 const folkColors=["#886658","#718150","#918c67","#947d9a","#597b84","#a96b4f"];
-const footLanes=streets.filter(s=>["footway","pedestrian","path","steps"].includes(s.kind)&&distance(s.a,s.b)>3&&canWalk(s.a)&&canWalk(s.b));
+const footLanes=streets.filter(s=>!["primary","secondary","construction"].includes(s.kind)&&distance(s.a,s.b)>1&&
+ [0,.25,.5,.75,1].every(t=>canWalk([s.a[0]+(s.b[0]-s.a[0])*t,s.a[1]+(s.b[1]-s.a[1])*t])));
 const nearbyFoot=footLanes.filter(s=>distance(s.a,spawn)<160);
+const walkingJunctions=new Map();
+for(const segment of footLanes){
+ for(const [from,to] of [[segment.a,segment.b],[segment.b,segment.a]]){
+  const k=pointKey(from);if(!walkingJunctions.has(k))walkingJunctions.set(k,[]);
+  walkingJunctions.get(k).push({a:from,b:to});
+ }
+}
+const pedestrianNames=["Andrea","Giada","Roberto","Irene","Luca","Francesca","Carlo","Silvia","Pietro","Sara","Enrico","Laura"];
 const pedestrians=Array.from({length:165},(_,i)=>{
  const segment=pick(i<14&&nearbyFoot.length?nearbyFoot:footLanes);
- return {segment,length:distance(segment.a,segment.b),phase:random()*2,pace:1.1+random()*1.6,color:folkColors[i%folkColors.length],point:segment.a};
+ const t=random(),point=segment.a.map((v,axis)=>v+(segment.b[axis]-v)*t);
+ return {id:"passante-"+i,name:pedestrianNames[i%pedestrianNames.length],segment,length:distance(segment.a,segment.b),
+  offset:t*distance(segment.a,segment.b),pause:0,pace:1.1+random()*1.1,color:folkColors[i%folkColors.length],point};
 });
 function updatePedestrians(dt){
  for(const p of pedestrians){
-  p.phase=(p.phase+dt*p.pace/p.length)%2;
-  const t=p.phase<=1?p.phase:2-p.phase;
-  const {a,b}=p.segment;
+  if(modal.open&&speaker?.id===p.id)continue;
+  if(p.pause>0){p.pause-=dt;continue;}
+  p.offset+=dt*p.pace;
+  while(p.offset>=p.length){
+   p.offset-=p.length;
+   const exits=walkingJunctions.get(pointKey(p.segment.b))||[];
+   const forward=exits.filter(e=>pointKey(e.b)!==pointKey(p.segment.a));
+   p.segment=pick(forward.length?forward:exits.length?exits:[{a:p.segment.b,b:p.segment.a}]);
+   p.length=distance(p.segment.a,p.segment.b);
+   if(random()<.08)p.pause=.6+random()*2;
+  }
+  const t=p.offset/p.length,{a,b}=p.segment;
   p.point=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];
  }
 }
 function nearestPedestrian(){
- return pedestrians.find(person=>distance(player,person.point)<6);
+ return pedestrians.filter(person=>distance(player,person.point)<9).sort((a,b)=>distance(player,a.point)-distance(player,b.point))[0];
 }
 function pedestrianTalk(){
- const destination=actorById(tracked?.steps[missionStep(tracked)]?.[0])||actorById("moro");
- ambientDialog("Passante","Scusi, mi può dare una mano?",
-  "Volentieri. Cerchi "+destination.site+". Se vuole, le indico dove andare sulla mappa.",destination);
+ const person=nearestPedestrian();
+ if(!person)return;
+ speaker=person;
+ conversationMenu({...person,site:"Per strada a Mondovì",level:"B2",title:"Due parole per strada",generic:true,turns:pedestrianTurns(person)});
 }
 function setupCitySystems(){
  $("openMissions").onclick=missionDialog;$("vehicle").onclick=vehicleAction;

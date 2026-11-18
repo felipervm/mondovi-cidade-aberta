@@ -8,6 +8,7 @@ for marker, file in {
     "GAME_CONTENT": "city-dialogues.js",
     "GAME_CODE": "city.js",
     "GAME_SYSTEMS": "city-systems.js",
+    "IMMERSION": "city-immersion.js",
 }.items():
     content = (src / file).read_text(encoding="utf-8")
     if marker == "MAP_DATA":
